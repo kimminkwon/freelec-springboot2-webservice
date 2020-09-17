@@ -1,6 +1,7 @@
 package com.jojoldu.book.springboot.web;
 
 import com.jojoldu.book.springboot.web.dto.PostsUpdateRequestDto;
+import net.bytebuddy.implementation.bind.MethodDelegationBinder;
 import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -22,6 +23,8 @@ import com.jojoldu.book.springboot.domain.posts.PostsRepository;
 import com.jojoldu.book.springboot.web.dto.PostsSaveRequestDto;
 
 import javax.persistence.PostUpdate;
+import java.time.LocalDateTime;
+import java.time.chrono.ChronoLocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -103,5 +106,41 @@ public class PostsApiControllerTest {
         List<Posts> all = postsRepository.findAll();
         assertThat(all.get(0).getTitle()).isEqualTo(expectedTitle);
         assertThat(all.get(0).getContent()).isEqualTo(expectedContent);
+    }
+
+    @Test
+    public void modifiedTime_비교() {
+        // given
+        Posts savePosts = postsRepository.save(
+                Posts.builder()
+                        .title("title")
+                        .content("content")
+                        .author("author")
+                        .build()
+        );
+        LocalDateTime firstModifiedTime = savePosts.getModifiedTime();
+
+        Long updateId = savePosts.getId();
+        PostsUpdateRequestDto requestDto = PostsUpdateRequestDto.builder()
+                .title("title2")
+                .content("content2")
+                .build();
+
+        String url = "http://localhost:" + port + "/api/v1/posts/" + updateId;
+
+        HttpEntity<PostsUpdateRequestDto> requestEntity = new HttpEntity<>(requestDto);
+
+        // when
+        ResponseEntity<Long> responseEntity = restTemplate.exchange(url, HttpMethod.PUT, requestEntity, Long.class);
+
+        // then
+        assertThat(responseEntity.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(responseEntity.getBody()).isGreaterThan(0L);
+
+        List<Posts> all = postsRepository.findAll();
+        assertThat(all.get(0).getTitle()).isEqualTo("title2");
+        assertThat(all.get(0).getContent()).isEqualTo("content2");
+        assertThat(all.get(0).getModifiedTime().isAfter(firstModifiedTime));
+        System.out.println(">>>>>>>>>>> firstModifiedTime = " + firstModifiedTime + ", lastModifiedTime=" + all.get(0).getModifiedTime());
     }
 }
